@@ -3,6 +3,7 @@ package main
 import (
 	"archive/tar"
 	"bufio"
+	"bytes"
 	"compress/gzip"
 	"errors"
 	"io"
@@ -31,6 +32,13 @@ func splitAsh0Bundle(data []byte) [][]byte {
 			start = i
 		}
 	}
+
+	if start == -1 {
+		println("fuck", start)
+		println(string(data))
+		os.Exit(1)
+	}
+
 	splitData = append(splitData, data[start:])
 
 	return splitData
@@ -44,6 +52,17 @@ func splitAsh0Bundle(data []byte) [][]byte {
 //	course_data_sub.cdt (cdt level data) - Sub world data
 //	thumbnail1.tnl (8 byte checksum + JPEG data) - Level thumbnail
 func convertLevelData(id string, data []byte) error {
+	bytesReader := bytes.NewReader(data)
+	bufReader := bufio.NewReader(bytesReader)
+	status, _, err := bufReader.ReadLine()
+	if err != nil {
+		return err
+	}
+
+	if !strings.Contains(string(status), "200") {
+		return nil
+	}
+
 	file, err := os.Create("output/" + id + ".tar.zst")
 	if err != nil {
 		return err
@@ -109,6 +128,8 @@ func main() {
 		archiveFile = strings.TrimSuffix(args[0], ".warc.gz")
 	} else if strings.HasSuffix(args[0], ".warc.os.cdx.gz") {
 		archiveFile = strings.TrimSuffix(args[0], ".warc.os.cdx.gz")
+	} else if strings.HasSuffix(args[0], ".warc.") {
+		archiveFile = strings.TrimSuffix(args[0], ".warc.")
 	} else {
 		log.Fatal("Invalid file type, must be a .warc.gz or .warc.os.cdx.gz file, and both should be in the same directory")
 	}
@@ -182,10 +203,6 @@ func main() {
 		fileName := pathParts[len(pathParts)-1]
 
 		data, err := io.ReadAll(record.Content)
-		if err != nil {
-			log.Fatal(err)
-		}
-
 		if err != nil {
 			log.Fatal(err)
 		}
