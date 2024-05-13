@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"net/url"
@@ -116,24 +117,7 @@ func convertLevelData(id string, data []byte) error {
 	return nil
 }
 
-func main() {
-	os.MkdirAll("output/", 0755)
-	args := os.Args[1:]
-	if len(args) == 0 {
-		log.Fatal("No file specified, please provide a .warc.gz or .warc.os.cdx.gz file")
-	}
-
-	var archiveFile string
-	if strings.HasSuffix(args[0], ".warc.gz") {
-		archiveFile = strings.TrimSuffix(args[0], ".warc.gz")
-	} else if strings.HasSuffix(args[0], ".warc.os.cdx.gz") {
-		archiveFile = strings.TrimSuffix(args[0], ".warc.os.cdx.gz")
-	} else if strings.HasSuffix(args[0], ".warc.") {
-		archiveFile = strings.TrimSuffix(args[0], ".warc.")
-	} else {
-		log.Fatal("Invalid file type, must be a .warc.gz or .warc.os.cdx.gz file, and both should be in the same directory")
-	}
-
+func extract_file(archiveFile string) {
 	file, err := os.OpenFile(archiveFile+".warc.os.cdx.gz", os.O_RDONLY, 0644)
 	if err != nil {
 		panic(err)
@@ -213,5 +197,55 @@ func main() {
 		}
 
 		bar.Add(1)
+	}
+}
+
+func extract_dir(dir string, files []os.DirEntry) {
+	archiveFiles := []string{}
+	for _, file := range files {
+		if strings.HasSuffix(file.Name(), ".warc.gz") {
+			archiveFiles = append(archiveFiles, dir+"/"+strings.TrimSuffix(file.Name(), ".warc.gz"))
+		}
+	}
+
+	for i, archiveFile := range archiveFiles {
+		log.Println("Processing", archiveFile, i+1, "/", len(archiveFiles))
+		extract_file(archiveFile)
+		fmt.Println("\n Finished")
+	}
+}
+
+func main() {
+	os.MkdirAll("output/", 0755)
+	args := os.Args[1:]
+	if len(args) == 0 {
+		log.Fatal("No file specified, please provide a .warc.gz or .warc.os.cdx.gz file")
+	}
+
+	var archiveFile string
+	if strings.HasSuffix(args[0], ".warc.gz") {
+		archiveFile = strings.TrimSuffix(args[0], ".warc.gz")
+		extract_file(archiveFile)
+	} else if strings.HasSuffix(args[0], ".warc.os.cdx.gz") {
+		archiveFile = strings.TrimSuffix(args[0], ".warc.os.cdx.gz")
+		extract_file(archiveFile)
+	} else if strings.HasSuffix(args[0], ".warc.") {
+		archiveFile = strings.TrimSuffix(args[0], ".warc.")
+		extract_file(archiveFile)
+	} else {
+		fileInfo, err := os.Stat(args[0])
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		if fileInfo.IsDir() {
+			files, err := os.ReadDir(args[0])
+			if err != nil {
+				log.Fatal(err)
+			}
+			extract_dir(args[0], files)
+		} else {
+			log.Fatal("Invalid file type, must be a .warc.gz or .warc.os.cdx.gz file, and both should be in the same directory")
+		}
 	}
 }
